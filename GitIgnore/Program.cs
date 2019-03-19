@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using CommandLine;
@@ -84,24 +85,38 @@ namespace GitIgnore
                     Copy(files[0]);
                     break;
                 default:
-                    Print(
-                        "more than one file found." +
-                        "\nPlease select the file to be copied using the ArrowUp and ArrowDown key\n" +
-                        "and press enter to copy the selected file",
-                        ConsoleColor.Yellow);
+                    try
+                    {
+                        Console.SetCursorPosition(Console.CursorLeft, Console.CursorTop);
+
+                        Print(
+                            "more than one file found." +
+                            "\nPlease select the file to be copied using the ArrowUp and ArrowDown key\n" +
+                            "and press enter to copy the selected file",
+                            ConsoleColor.Yellow);
+                    }
+                    catch (IOException)
+                    {
+                        // ignore it => special treatment when no console window present
+                    }
 
                     var foregroundColor = Console.ForegroundColor;
-                    var current = new FileInfo("foo");
                     var counter = 0;
                     while (true)
                     {
-                        Console.SetCursorPosition(0, Console.CursorTop);
-                        Console.ForegroundColor = Console.BackgroundColor;
-                        Console.Write(current.Name);
+                        var current = files[counter % files.Count];
 
-                        current = files[counter % files.Count];
+                        try
+                        {
+                            Console.SetCursorPosition(0, Console.CursorTop);
+                        }
+                        catch (IOException)
+                        {
+                            var selection = SelectFromNumberedList();
+                            if (!(selection is null)) Copy(selection);
+                            return 0;
+                        }
 
-                        Console.SetCursorPosition(0, Console.CursorTop);
                         Console.ForegroundColor = foregroundColor;
                         Console.Write(current.Name);
 
@@ -120,6 +135,38 @@ namespace GitIgnore
                     }
             }
 
+            FileInfo SelectFromNumberedList()
+            {
+                foreach (var entry in files.Select((f, i) => $"{i + 1,3:d}: {f.Value.Name}"))
+                {
+                    Print(entry, ConsoleColor.White);
+                }
+
+                Console.Write("\nInput the number you want to ignore: ");
+                var digits = new List<int>();
+                while (true)
+                {
+                    var read = Console.Read();
+                    if (read < 0) return default;
+
+                    switch (Convert.ToChar(read))
+                    {
+                        case char key when char.IsDigit(key):
+                            digits.Add(key % 48);
+                            break;
+                        case char key when key.In('\n', '\r'):
+                            var selection = digits
+                                .Select((value, index) => (value, index))
+                                .Aggregate(0, (accumulator, value) => accumulator + (int)Math.Pow(10, value.index) * value.value)
+                                - 1;
+                            if (files.ContainsKey(selection)) return files[selection];
+
+                            Print($"Can not find entry {selection + 1}", ConsoleColor.Red);
+                            return SelectFromNumberedList();
+                    }
+                }
+            }
+
             ConsoleKeyInfo ReadNavigationKey()
             {
                 while (true)
@@ -132,8 +179,28 @@ namespace GitIgnore
                 }
             }
 
-            void Copy(FileInfo file) => file.CopyTo(".gitignore");
+            void Copy(FileInfo file)
+            {
+                try
+                {
+                    file.CopyTo(".gitignore", false);
+                }
+                catch (IOException)
+                {
+                    Print("A .gitignore file already exists.\nUse the --force (-p) switch to force an override.", ConsoleColor.Red);
+                    Print(Environment.CommandLine + " --force", ConsoleColor.Yellow);
+                }
+            }
 
+            return 0;
+        }
+
+        private static int Print(string message, ConsoleColor color)
+        {
+            var tmp = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            Console.WriteLine(message);
+            Console.ForegroundColor = tmp;
             return 0;
         }
     }
