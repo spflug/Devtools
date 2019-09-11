@@ -183,6 +183,7 @@ namespace GitIgnore
             {
                 try
                 {
+                    Print($"copying {file.Name} to .gitignore", ConsoleColor.Cyan);
                     file.CopyTo(".gitignore", false);
                 }
                 catch (IOException)
