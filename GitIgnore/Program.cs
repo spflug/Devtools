@@ -82,7 +82,7 @@ namespace GitIgnore
             {
                 case 0: return Print("no file found", ConsoleColor.Red) + 1;
                 case 1:
-                    Copy(files[0]);
+                    Copy(files[0], options.ForceOverride);
                     break;
                 default:
                     try
@@ -113,7 +113,7 @@ namespace GitIgnore
                         catch (IOException)
                         {
                             var selection = SelectFromNumberedList();
-                            if (!(selection is null)) Copy(selection);
+                            if (!(selection is null)) Copy(selection, options.ForceOverride);
                             return 0;
                         }
 
@@ -123,7 +123,7 @@ namespace GitIgnore
                         switch (ReadNavigationKey().Key)
                         {
                             case ConsoleKey.Enter:
-                                Copy(current);
+                                Copy(current, options.ForceOverride);
                                 return 0;
                             case ConsoleKey.DownArrow:
                                 if (counter > 0) counter--;
@@ -179,12 +179,12 @@ namespace GitIgnore
                 }
             }
 
-            void Copy(FileInfo file)
+            void Copy(FileInfo file, bool forceOverride)
             {
                 try
                 {
                     Print($"copying {file.Name} to .gitignore", ConsoleColor.Cyan);
-                    file.CopyTo(".gitignore", false);
+                    file.CopyTo(".gitignore", forceOverride);
                 }
                 catch (IOException)
                 {
